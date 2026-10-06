@@ -1,0 +1,6 @@
+{
+  "name": "PocketMentor",
+  "description": "A mentor that fits in your pocket — personalized guidance, roadmap, daily goals, expressive AI voice narration, and creative writing analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
