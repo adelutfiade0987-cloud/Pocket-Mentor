@@ -23,6 +23,7 @@ import {
   saveStoredFinance,
   getStoredEvents,
   saveStoredEvents,
+  recordActivity,
   DEFAULT_USER,
 } from './utils/storage';
 
@@ -108,6 +109,10 @@ export default function App() {
       if (g.id === id) {
         const nextCompleted = !g.completed;
 
+        if (nextCompleted) {
+          recordActivity(user.id, today);
+        }
+
         // Auto Tick Milestones (Section 5B & 6):
         // When linked goal is completed, roadmap milestone ticks itself!
         if (g.linkedMilestoneId) {
@@ -150,9 +155,15 @@ export default function App() {
 
   // Milestone handlers
   const handleToggleMilestone = (id: string) => {
-    const updated = milestones.map((m) =>
-      m.id === id ? { ...m, completed: !m.completed } : m
-    );
+    const today = new Date().toISOString().split('T')[0];
+    const updated = milestones.map((m) => {
+      if (m.id === id) {
+        const next = !m.completed;
+        if (next) recordActivity(user.id, today);
+        return { ...m, completed: next };
+      }
+      return m;
+    });
     setMilestones(updated);
     saveStoredMilestones(user.id, updated);
   };
@@ -174,6 +185,8 @@ export default function App() {
 
   // Journal handler
   const handleSaveJournalEntry = (entry: JournalEntry) => {
+    const today = new Date().toISOString().split('T')[0];
+    recordActivity(user.id, today);
     const exists = journal.some((j) => j.id === entry.id || j.date === entry.date);
     let updated: JournalEntry[];
     if (exists) {

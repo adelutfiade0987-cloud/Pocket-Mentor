@@ -43,7 +43,9 @@ export interface Goal {
 
 export interface Milestone {
   id: string;
-  stageId: LifeStage;
+  stageId: LifeStage | string;
+  categoryId?: string;
+  subPhaseId?: string;
   title: string;
   description: string;
   category: GoalCategory;

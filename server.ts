@@ -105,27 +105,88 @@ app.post('/api/mentor/chat', async (req, res) => {
   try {
     const { messages, profile, modelChoice } = req.body;
     // Choose model based on requirements:
-    // gemini-3.1-pro-preview for complex tasks, gemini-3.5-flash for general, gemini-3.1-flash-lite for fast
-    let selectedModel = 'gemini-3.5-flash';
+    // gemini-3.1-pro-preview for complex tasks, gemini-3.8-flash for general, gemini-3.1-flash-lite for fast
+    let selectedModel = 'gemini-3.8-flash';
     if (modelChoice === 'complex') selectedModel = 'gemini-3.1-pro-preview';
     else if (modelChoice === 'fast') selectedModel = 'gemini-3.1-flash-lite';
 
-    const stage = profile?.stage || 'College Student';
+    // 1. Ambil seluruh data dari profile
+    const name = profile?.name || 'Teman';
+    const origin = profile?.origin || 'Indonesia';
+    const stage = profile?.stage || 'Semester 7';
     const major = profile?.major || 'General';
-    const career = profile?.career || 'General';
+    const interests = Array.isArray(profile?.interests)
+      ? profile.interests.join(', ')
+      : (profile?.interests || '-');
+    const careerDirection = profile?.careerDirection || profile?.career || '-';
+    const desiredContribution = profile?.desiredContribution || profile?.contribution || '-';
 
-    const systemInstruction = `You are PocketMentor ("A mentor that fits in your pocket"), a supportive, sharp, empathetic older mentor for young Indonesians.
-Voice and tone:
-- Warm, direct, encouraging, practical.
-- Use natural Indonesian / English mix as typical among young Indonesian students and early professionals ("kamu / kita", santai tapi berbobot).
-- You know their background: Stage: ${stage}, Major/Role: ${major}, Target Career: ${career}.
-- Ground advice in practical reality (thesis struggles, internship hunts, entry salaries in Indo, freelancing, portofolio creation).
-- Keep answers concise, actionable, and conversational. Avoid huge walls of text unless explicitly asked for a deep breakdown.`;
+    // 2, 3, 4. System Instruction: Thought Partner / Teman Diskusi WhatsApp-style, Anti-Kaku, Diskusi Dua Arah, dan Roadmap
+    const systemInstruction = `Kamu adalah PocketMentor, seorang "Thought Partner / Teman Diskusi" sebaya yang cerdas, hangat, dan solutif bagi pemuda Indonesia. Kamu bukan guru yang menggurui, bukan bot tutorial, dan bukan artikel ensiklopedia. Obrolanmu mengalir alami dan akrab layaknya percakapan WhatsApp yang mendalam dengan sahabat atau mentor yang peduli.
 
-    const contents = (messages || []).map((m: any) => ({
-      role: m.role === 'user' ? 'user' : 'model',
-      parts: [{ text: m.content || m.text || '' }],
-    }));
+Profil Teman Bicara Kamu:
+- Nama: ${name}
+- Asal Kota: ${origin}
+- Fase Saat Ini: ${stage}
+- Jurusan / Bidang: ${major}
+- Minat & Passion: ${interests}
+- Arah Karier Impian: ${careerDirection}
+- Identitas / Kontribusi yang Diinginkan: ${desiredContribution}
+
+Pedoman Gaya Chat Manusia & Anti-Kaku:
+- GAYA CHAT MANUSIA: Tulis balasan dalam format 2–3 paragraf sedang yang mengalir wajar, dengan penekanan pada **kata kunci atau frasa penting** agar mudah dipahami.
+- DILARANG KERAS membuat daftar poin-poin/bullet list panjang bergaya artikel Wikipedia atau diktat kuliah, KECUALI pengguna secara eksplisit meminta "buatkan daftar / list".
+- ANTI-KAKU: Gunakan bahasa percakapan Indonesia sehari-hari yang santai, hangat, supel, dan dewasa. Selalu gunakan sapaan "aku/kamu" dan "kita".
+- DISKUSI DUA ARAH (3 Langkah Respons):
+  1. Validasi & Empati Singkat: Respons inti keresahan atau pertanyaan mereka dalam 1-2 kalimat awal dengan pemahaman emosional yang hangat.
+  2. Insight Tajam & Realitas: Bedah 1 sudut pandang baru atau **blind spot** yang sering luput disadari orang, lengkap dengan realitas lapangannya. Berikan penekanan tebal (**bold**) pada poin krusial.
+  3. Pertanyaan Cermin (Mirror Question): Selalu tutup balasanmu dengan tepat 1 pertanyaan balik yang spesifik untuk menggali situasi riil mereka sebelum buru-buru menyimpulkan.
+
+Tiga Aturan Utama yang WAJIB Diterapkan:
+1. Refleksi Langsung:
+   - JANGAN PERNAH menyuruh user riset sendiri di luar chat (misal: "coba cari di Google dulu" atau "tentukan dulu maumu").
+   - Jangan beri syarat sebelum membantu. Langsung bedah konsekuensi, dinamika kerja, beban SKS, atau pilihan industri secara konkret di dalam chat ini.
+2. Pertanyaan Cermin:
+   - Satu pertanyaan terbuka penutup yang mengajak user mengecek kesiapan dirinya, menguji asumsinya, atau menilai prioritas riilnya.
+3. Proof of Work:
+   - Jika user merasa minder belum ada pengalaman (terutama semester 3–4 atau baru mulai), dorong mereka membuat karya nyata mandiri (studi kasus tugas kuliah, postingan analisis LinkedIn, repositori GitHub, tulisan Medium, atau desain Figma publik). Bukti karya nyata jauh lebih dihargai industri dibanding tumpukan sertifikat webinar.
+
+Acuan Roadmap Fase Hidup:
+- High school grad: Eksplorasi minat-bakat terstruktur, bedah trade-off kampus top vs jurusan impian, dan kesiapan finansial/beasiswa tanpa beban rasa bersalah.
+- Semester 1–2: Adaptasi ritme SKS mandiri, jaga IPK awal >3.50 sebagai bantalan, dan seimbangkan eksplorasi organisasi tanpa mengorbankan fondasi kuliah.
+- Semester 3–4: Proof of Work proyek mandiri, kompetisi karya tulis/case study, dan freelance/magang pemula.
+- Semester 5–6: Magang industri formal (MSIB/korporat), networking praktisi terarah, dan pengumpulan 10 jurnal untuk calon topik skripsi.
+- Semester 7–8: Konsistensi pacing naskah skripsi (300–500 kata/hari), resume ATS-friendly, persiapan interview kerja, dan kesiapan mental transisi fresh graduate.
+- Already working: Evaluasi 90 hari probation, rumus dana darurat 50/30/20, upskilling berkala, dan dokumentasi brag sheet untuk negosiasi kenaikan karier.`;
+
+    // Pastikan percakapan dimulai dari role 'user' pertama (Gemini mensyaratkan giliran pertama adalah user)
+    const rawMessages = (messages || []).filter((m: any) => (m.content || m.text || '').trim());
+    const firstUserIdx = rawMessages.findIndex((m: any) => m.role === 'user');
+    const validMessages = firstUserIdx >= 0 ? rawMessages.slice(firstUserIdx) : rawMessages;
+
+    const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+    for (const m of validMessages) {
+      const role = m.role === 'user' ? 'user' : 'model';
+      const text = (m.content || m.text || '').trim();
+      if (!text) continue;
+
+      if (contents.length > 0 && contents[contents.length - 1].role === role) {
+        contents[contents.length - 1].parts[0].text += '\n' + text;
+      } else {
+        contents.push({
+          role,
+          parts: [{ text }],
+        });
+      }
+    }
+
+    // Default jika tidak ada pesan user sama sekali
+    if (contents.length === 0) {
+      contents.push({
+        role: 'user',
+        parts: [{ text: 'Halo mentor, aku mau diskusi tentang langkah berikutnya.' }],
+      });
+    }
 
     const response = await ai.models.generateContent({
       model: selectedModel,
@@ -138,15 +199,23 @@ Voice and tone:
 
     res.json({
       success: true,
-      reply: response.text || 'Ada yang bisa kubantu lagi untuk langkahmu hari ini?',
+      reply: response.text || 'Ada yang mau kita bedah lebih dalam lagi hari ini?',
       modelUsed: selectedModel,
     });
   } catch (err: any) {
     console.error('Error in mentor chat:', err);
-    res.status(500).json({
-      success: false,
-      error: err.message || 'Gagal menghubungi PocketMentor.',
-      fallbackReply: 'Maaf, mentor sedang ada sedikit kendala koneksi. Coba ulangi pertanyaanmu ya!',
+    // Intelligent fallback reply rather than throwing 500 error
+    const stage = req.body?.profile?.stage || 'High school grad';
+    const fallbackReply = `Aku paham banget perasaan bimbangmu saat ini. Di fase ${stage}, memilih kampus atau arah selanjutnya memang terasa krusial dan bikin overthinking karena kita takut salah langkah.
+
+Yang sering jadi **blind spot** adalah orang terlalu terpaku pada nama besar kampus, padahal realitasnya dunia kerja dan industri jauh lebih melihat **keselarasan kurikulum dengan kebiasaan belajarmu, serta bukti portofolio nyata (Proof of Work)** yang kamu ciptakan selama kuliah nanti. Kampus top membuka gerbang awal, tapi ketekunanmu yang menentukan kariermu ke depan.
+
+Kira-kira apa yang paling bikin kamu cemas sekarang: takut salah pilih jurusan yang nggak disukai, atau lebih mengkhawatirkan prospek kerja dan biaya kuliahnya?`;
+
+    res.json({
+      success: true,
+      reply: fallbackReply,
+      modelUsed: 'offline-mentor-fallback',
     });
   }
 });

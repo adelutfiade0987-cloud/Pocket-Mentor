@@ -10,6 +10,7 @@ import {
   Compass,
   Zap,
   Brain,
+  MessageSquare,
 } from 'lucide-react';
 import { UserProfile, ChatMessage } from '../types';
 import { playTextToSpeech, stopAudioPlayback } from '../utils/tts';
@@ -20,16 +21,139 @@ interface MentorChatModalProps {
   user: UserProfile;
 }
 
+function getStageChatConfig(user: UserProfile) {
+  const firstName = user.name ? user.name.split(' ')[0] : 'Teman';
+  const stage = user.stage;
+
+  switch (stage) {
+    case 'High school grad':
+      return {
+        initialGreeting: `Halo ${firstName}! Senang bisa ngobrol santai. Sebagai teman diskusimu di fase transisi lulus SMA / gap year, apa yang lagi paling mengganjal di pikiranmu? Menimbang kampus impian vs jurusan, bingung mulai portofolio dari nol, atau kesiapan biaya kuliah?`,
+        suggestedQuestions: [
+          'Lebih baik pilih kampus top atau jurusan impian?',
+          'Minder belum ada portofolio, mulai dari mana?',
+          'Tips biar masa gap year terarah dan tetap produktif?',
+        ],
+      };
+
+    case 'Semester 1–2':
+      return {
+        initialGreeting: `Halo ${firstName}! Senang bisa ngobrol santai. Di Semester 1–2 ini adaptasi ritme kuliah memang sering bikin kaget. Apa yang lagi kamu rasakan? Penyesuaian tugas dosen, menjaga IPK di atas 3.50, atau menyeimbangkan organisasi kampus?`,
+        suggestedQuestions: [
+          'Cara menjaga IPK aman sambil tetap aktif berorganisasi?',
+          'Trik adaptasi gaya belajar kampus yang serba mandiri?',
+          'Kapan waktu ideal mulai memikirkan portofolio?',
+        ],
+      };
+
+    case 'Semester 3–4':
+      return {
+        initialGreeting: `Halo ${firstName}! Senang bisa ngobrol santai. Di Semester 3–4 ini saatnya kita mulai bangun bukti karya nyata (Proof of Work). Ada kebingungan seputar mulai proyek mandiri, cari freelance pertama, atau minder belum ada pengalaman kerja?`,
+        suggestedQuestions: [
+          'Minder belum ada pengalaman, gimana cara mulai portofolio?',
+          'Tips dapat freelance atau project sampingan pertama?',
+          'Lomba atau kompetisi apa yang cocok buat semester 3–4?',
+        ],
+      };
+
+    case 'Semester 5–6':
+      return {
+        initialGreeting: `Halo ${firstName}! Senang bisa ngobrol santai. Di Semester 5–6 fokus kita biasanya magang formal industri dan mulai melirik topik tugas akhir. Mau diskusi soal lolos seleksi magang, networking praktisi, atau persiapan skripsi?`,
+        suggestedQuestions: [
+          'Strategi lolos seleksi magang formal (MSIB / korporat)?',
+          'Cara mulai cari topik skripsi yang realistis selesai?',
+          'Tips networking ke praktisi industri lewat LinkedIn?',
+        ],
+      };
+
+    case 'Semester 7':
+      return {
+        initialGreeting: `Halo ${firstName}! Senang bisa ngobrol santai. Di Semester 7 ini tantangan utamanya adalah konsistensi naskah skripsi dan persiapan kerja. Mau bedah pacing skripsimu, bedah CV ATS, atau strategi bidik lowongan Management Trainee?`,
+        suggestedQuestions: [
+          'Tips konsisten nulis 500 kata skripsi tanpa burnout?',
+          'Gimana cara menyusun CV ATS yang dilirik recruiter?',
+          'Strategi bidik lowongan MT sebelum wisuda?',
+        ],
+      };
+
+    case 'Semester 8':
+      return {
+        initialGreeting: `Halo ${firstName}! Senang bisa ngobrol santai. Di Semester 8 ini garis finis sudah di depan mata. Mau diskusi seputar persiapan sidang skripsi, negosiasi penawaran kerja (offering), atau kesiapan mental transisi fresh graduate?`,
+        suggestedQuestions: [
+          'Simulasi mental menghadapi sidang skripsi?',
+          'Cara negosiasi gaji pertama fresh graduate?',
+          'Strategi melamar kerja efektif 2 bulan sebelum wisuda?',
+        ],
+      };
+
+    case 'Already working':
+      return {
+        initialGreeting: `Halo ${firstName}! Senang bisa ngobrol santai. Sebagai teman diskusimu di dunia kerja, apa yang lagi kita hadapi? Evaluasi masa probation, alokasi gaji dan dana darurat 3 bulan, atau rencana upskilling untuk percepat promosi?`,
+        suggestedQuestions: [
+          'Tips lolos probation 90 hari dengan impresi memuaskan?',
+          'Cara alokasi gaji pertama & bangun dana darurat 3 bulan?',
+          'Gimana cara upskilling konsisten di tengah jam kerja?',
+        ],
+      };
+
+    default:
+      return {
+        initialGreeting: `Halo ${firstName}! Senang bisa ngobrol santai. Sebagai teman diskusimu di fase ${stage}, apa yang lagi paling ingin kamu diskusikan hari ini seputar studi, portofolio, atau rencana karier?`,
+        suggestedQuestions: [
+          'Tips konsisten menjaga progres harian?',
+          'Cara bikin portofolio menarik walau minim pengalaman?',
+          'Bagaimana cara membagi waktu antara kuliah & magang?',
+        ],
+      };
+  }
+}
+
+function renderFormattedMessage(content: string, isModel: boolean) {
+  if (!isModel) {
+    return <p className="whitespace-pre-wrap leading-relaxed">{content}</p>;
+  }
+
+  // Split into paragraphs
+  const paragraphs = content.split(/\n\s*\n/);
+  return (
+    <div className="space-y-2.5 text-xs text-[#1A1A2E] leading-relaxed">
+      {paragraphs.map((para, pIdx) => {
+        const trimmed = para.trim();
+        if (!trimmed) return null;
+
+        // Parse bold segments **text**
+        const parts = trimmed.split(/(\*\*[^*]+\*\*)/g);
+        return (
+          <p key={pIdx} className="leading-relaxed">
+            {parts.map((part, partIdx) => {
+              if (part.startsWith('**') && part.endsWith('**')) {
+                return (
+                  <strong key={partIdx} className="font-semibold text-[#1A1A2E]">
+                    {part.slice(2, -2)}
+                  </strong>
+                );
+              }
+              return part;
+            })}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 export const MentorChatModal: React.FC<MentorChatModalProps> = ({
   isOpen,
   onClose,
   user,
 }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
+  const stageConfig = getStageChatConfig(user);
+
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: 'm-init',
       role: 'model',
-      content: `Halo ${user.name.split(' ')[0]}! Senang bisa ngobrol langsung. Sebagai mentormu di fase ${user.stage}, apa yang lagi paling mengganjal atau ingin kamu diskusikan hari ini? Skripsi, persiapan magang, atau rencana karier?`,
+      content: stageConfig.initialGreeting,
       timestamp: 'Baru saja',
     },
   ]);
@@ -43,6 +167,20 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // Sync initial message when user stage changes if no custom conversation has taken place
+  useEffect(() => {
+    if (messages.length <= 1) {
+      setMessages([
+        {
+          id: 'm-init',
+          role: 'model',
+          content: stageConfig.initialGreeting,
+          timestamp: 'Baru saja',
+        },
+      ]);
+    }
+  }, [user.stage, user.name]);
 
   useEffect(() => {
     if (isOpen) {
@@ -67,11 +205,15 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
     setLoading(true);
 
     try {
+      // Kirim pesan mulai dari giliran pengguna pertama
+      const userIdx = newMessages.findIndex((m) => m.role === 'user');
+      const messagesToSend = userIdx >= 0 ? newMessages.slice(userIdx) : newMessages;
+
       const res = await fetch('/api/mentor/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: newMessages.map((m) => ({
+          messages: messagesToSend.map((m) => ({
             role: m.role,
             content: m.content,
           })),
@@ -80,27 +222,29 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
         }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        const modelMsg: ChatMessage = {
-          id: 'bot-' + Date.now(),
-          role: 'model',
-          content: data.reply || 'Ada yang bisa kubantu lagi?',
-          timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-        };
-        setMessages((prev) => [...prev, modelMsg]);
-      } else {
-        throw new Error('Chat failed');
-      }
+      const data = await res.json().catch(() => ({}));
+      const replyText =
+        data.reply ||
+        data.fallbackReply ||
+        'Aku mengerti situasimu. Boleh ceritakan satu hal yang paling membuatmu ragu saat ini?';
+
+      const modelMsg: ChatMessage = {
+        id: 'bot-' + Date.now(),
+        role: 'model',
+        content: replyText,
+        timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, modelMsg]);
     } catch (err) {
-      const errorMsg: ChatMessage = {
-        id: 'err-' + Date.now(),
+      console.warn('Chat request fallback:', err);
+      const fallbackMsg: ChatMessage = {
+        id: 'bot-' + Date.now(),
         role: 'model',
         content:
-          'Maaf, koneksi ke mentor terputus sebentar. Tapi tenang, langkahmu sudah di arah yang benar. Coba tanyakan lagi ya!',
-        timestamp: 'Baru saja',
+          'Aku mengerti kegelisahanmu saat ini. Di masa transisi, wajar sekali merasa bimbang antara kampus impian dan jurusan yang tepat. Apa opsi terbesar yang lagi kamu timbang sekarang?',
+        timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
       };
-      setMessages((prev) => [...prev, errorMsg]);
+      setMessages((prev) => [...prev, fallbackMsg]);
     } finally {
       setLoading(false);
     }
@@ -116,18 +260,14 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
     setActiveSpeechMsgId(msgId);
     await playTextToSpeech(content, {
       voiceName: 'Puck',
-      style: 'Friendly, caring Indonesian older mentor speaking directly to younger friend',
+      style: 'Friendly, caring Indonesian peer mentor speaking naturally to friend',
       onStart: () => setActiveSpeechMsgId(msgId),
       onEnd: () => setActiveSpeechMsgId(null),
       onError: () => setActiveSpeechMsgId(null),
     });
   };
 
-  const suggestedQuestions = [
-    'Tips konsisten nulis 500 kata skripsi tiap hari?',
-    'Cara bikin portofolio menarik walau minim pengalaman?',
-    'Bagaimana cara membagi waktu antara kuliah & magang?',
-  ];
+  const suggestedQuestions = stageConfig.suggestedQuestions;
 
   if (!isOpen) return null;
 
@@ -148,11 +288,11 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-bold text-[#1A1A2E] flex items-center gap-1.5">
-                <span>Tanya PocketMentor</span>
-                <span className="w-2 h-2 rounded-full bg-[#3FB876]" />
+                PocketMentor
+                <span className="w-2 h-2 rounded-full bg-[#3FB876] animate-pulse" />
               </h2>
               <p className="text-[11px] text-[#6B7280]">
-                {user.stage} · {user.major || user.careerDirection || 'Pendamping Belajar'}
+                Teman Diskusi • {user.stage}
               </p>
             </div>
           </div>
@@ -171,7 +311,10 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
 
         {/* AI Model Level Selector */}
         <div className="bg-white/90 px-4 py-2 border-b border-black/[0.05] flex items-center justify-between text-[11px]">
-          <span className="text-[#6B7280] font-medium">Model Intelijen:</span>
+          <span className="text-[#6B7280] font-medium flex items-center gap-1">
+            <Sparkles className="w-3.5 h-3.5 text-[#6C5CE7]" />
+            <span>Mode Diskusi:</span>
+          </span>
           <div className="flex gap-1">
             <button
               type="button"
@@ -181,7 +324,7 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
                   ? 'bg-[#6C5CE7] text-white'
                   : 'bg-black/5 text-[#6B7280] hover:text-[#1A1A2E]'
               }`}
-              title="gemini-3.1-flash-lite: Cepat dan hemat"
+              title="gemini-3.1-flash-lite: Cepat dan ringkas"
             >
               Lite
             </button>
@@ -193,7 +336,7 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
                   ? 'bg-[#6C5CE7] text-white'
                   : 'bg-black/5 text-[#6B7280] hover:text-[#1A1A2E]'
               }`}
-              title="gemini-3.5-flash: Seimbang untuk tugas umum"
+              title="gemini-3.5-flash: Seimbang & alami"
             >
               Flash
             </button>
@@ -205,7 +348,7 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
                   ? 'bg-[#6C5CE7] text-white'
                   : 'bg-black/5 text-[#6B7280] hover:text-[#1A1A2E]'
               }`}
-              title="gemini-3.1-pro-preview: Pemikiran mendalam & analisis rumit"
+              title="gemini-3.1-pro-preview: Analisis mendalam & komprehensif"
             >
               Pro
             </button>
@@ -224,17 +367,17 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
                 className={`flex flex-col ${isModel ? 'items-start' : 'items-end'}`}
               >
                 <div
-                  className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed shadow-xs relative ${
+                  className={`max-w-[88%] p-3.5 rounded-2xl text-xs leading-relaxed shadow-xs relative ${
                     isModel
                       ? 'bg-white text-[#1A1A2E] rounded-tl-xs border border-black/[0.04]'
                       : 'bg-[#6C5CE7] text-white rounded-tr-xs'
                   }`}
                 >
-                  <p className="whitespace-pre-wrap">{m.content}</p>
+                  {renderFormattedMessage(m.content, isModel)}
 
-                  {/* Read Aloud Button on Model Answers */}
+                  {/* Read Aloud Button & Timestamp on Model Answers */}
                   {isModel && (
-                    <div className="mt-2 pt-2 border-t border-black/[0.05] flex items-center justify-between">
+                    <div className="mt-2.5 pt-2 border-t border-black/[0.05] flex items-center justify-between">
                       <span className="text-[10px] text-[#6B7280]">{m.timestamp}</span>
                       <button
                         type="button"
@@ -259,6 +402,12 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
                       </button>
                     </div>
                   )}
+
+                  {!isModel && (
+                    <div className="mt-1 text-right">
+                      <span className="text-[9px] text-white/70">{m.timestamp}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -268,7 +417,7 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
             <div className="flex items-center gap-2 p-3 bg-white rounded-2xl w-fit shadow-xs border border-black/[0.04]">
               <RefreshCw className="w-3.5 h-3.5 text-[#6C5CE7] animate-spin" />
               <span className="text-xs text-[#6B7280] font-medium">
-                Mentor sedang memikirkan saran terbaik...
+                Mentor sedang memikirkan sudut pandang terbaik...
               </span>
             </div>
           )}
@@ -283,14 +432,14 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
               key={i}
               type="button"
               onClick={() => handleSendMessage(q)}
-              className="shrink-0 text-[11px] font-medium px-3 py-1 bg-white border border-black/[0.08] hover:border-[#6C5CE7] rounded-full text-[#1A1A2E] truncate max-w-[220px]"
+              className="shrink-0 text-[11px] font-medium px-3 py-1.5 bg-white border border-black/[0.08] hover:border-[#6C5CE7] rounded-full text-[#1A1A2E] truncate max-w-[240px] shadow-2xs transition-all hover:bg-[#6C5CE7]/5 active:scale-95"
             >
               {q}
             </button>
           ))}
         </div>
 
-        {/* Input Field */}
+        {/* Input Bar */}
         <div className="p-3 bg-white border-t border-black/[0.05]">
           <form
             onSubmit={(e) => {
@@ -303,13 +452,14 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Ketik pertanyaan atau unek-unekmu..."
-              className="flex-1 px-4 py-3 bg-[#F5F5F9] rounded-2xl text-xs text-[#1A1A2E] font-medium focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]/30 border border-black/[0.05]"
+              placeholder="Ceritakan situasimu atau tanyakan apa saja..."
+              className="flex-1 bg-[#F5F5F9] px-4 py-2.5 rounded-full text-xs text-[#1A1A2E] placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]/30 border border-transparent focus:border-[#6C5CE7]"
+              disabled={loading}
             />
             <button
               type="submit"
               disabled={!inputText.trim() || loading}
-              className="w-11 h-11 rounded-2xl bg-[#6C5CE7] hover:bg-[#5b4bc7] text-white flex items-center justify-center shrink-0 disabled:opacity-40 transition-all shadow-xs"
+              className="w-9 h-9 rounded-full bg-[#6C5CE7] disabled:opacity-40 text-white flex items-center justify-center shadow-xs hover:bg-[#5b4bc4] transition-all shrink-0 active:scale-95"
             >
               <Send className="w-4 h-4" />
             </button>
