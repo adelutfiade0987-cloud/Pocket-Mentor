@@ -24,7 +24,23 @@ import {
   getStoredEvents,
   saveStoredEvents,
   recordActivity,
+  setStoredActivityDates,
   DEFAULT_USER,
+  isSupabaseConfigured,
+  syncProfileToSupabase,
+  fetchProfileFromSupabase,
+  syncGoalUpsert,
+  syncGoalDelete,
+  fetchGoalsFromSupabase,
+  syncMilestoneUpsert,
+  fetchMilestonesFromSupabase,
+  syncJournalUpsert,
+  fetchJournalFromSupabase,
+  syncFinanceUpsert,
+  fetchFinanceFromSupabase,
+  syncCalendarEventUpsert,
+  syncCalendarEventDelete,
+  fetchCalendarEventsFromSupabase,
 } from './utils/storage';
 
 import { SplashView } from './components/SplashView';
@@ -56,14 +72,95 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // Sync state on user change
+  // Sync state on user change & hydrate from Supabase
   useEffect(() => {
+    let isCancelled = false;
+
+    // 1. Instant local load (optimistic fallback)
     saveStoredUser(user);
     setGoals(getStoredGoals(user.id));
     setMilestones(getStoredMilestones(user.id));
     setJournal(getStoredJournal(user.id));
     setFinance(getStoredFinance(user.id));
     setEvents(getStoredEvents(user.id));
+
+    // 2. Asynchronous remote sync from Supabase if configured
+    if (isSupabaseConfigured() && user.id) {
+      (async () => {
+        try {
+          // 1. Fetch remote profile & activity dates
+          const profileRes = await fetchProfileFromSupabase(user.id);
+          if (profileRes && !isCancelled) {
+            const { profile: remoteProfile, activityDates } = profileRes;
+            if (remoteProfile) {
+              setUser((prev) => {
+                const merged = { ...prev, ...remoteProfile };
+                saveStoredUser(merged);
+                return merged;
+              });
+            }
+            if (activityDates && activityDates.length > 0) {
+              setStoredActivityDates(user.id, activityDates);
+            }
+          }
+
+          // 2. Fetch remote goals
+          const remoteGoals = await fetchGoalsFromSupabase(user.id);
+          if (remoteGoals && remoteGoals.length > 0 && !isCancelled) {
+            setGoals(remoteGoals);
+            saveStoredGoals(user.id, remoteGoals);
+          }
+
+          // 3. Fetch remote milestones
+          const remoteMilestones = await fetchMilestonesFromSupabase(user.id);
+          if (remoteMilestones && remoteMilestones.length > 0 && !isCancelled) {
+            const completedMap = new Map<string, boolean>();
+            const convertedMap = new Map<string, string | undefined>();
+            remoteMilestones.forEach((rm) => {
+              completedMap.set(rm.id, rm.completed);
+              if (rm.convertedToGoalId) convertedMap.set(rm.id, rm.convertedToGoalId);
+            });
+
+            setMilestones((prev) => {
+              const updated = prev.map((m) => {
+                const isComp = completedMap.has(m.id) ? completedMap.get(m.id)! : m.completed;
+                const convId = convertedMap.has(m.id) ? convertedMap.get(m.id) : m.convertedToGoalId;
+                return { ...m, completed: isComp, convertedToGoalId: convId };
+              });
+              saveStoredMilestones(user.id, updated);
+              return updated;
+            });
+          }
+
+          // 4. Fetch remote journal entries
+          const remoteJournal = await fetchJournalFromSupabase(user.id);
+          if (remoteJournal && remoteJournal.length > 0 && !isCancelled) {
+            setJournal(remoteJournal);
+            saveStoredJournal(user.id, remoteJournal);
+          }
+
+          // 5. Fetch remote finance data
+          const remoteFinance = await fetchFinanceFromSupabase(user.id);
+          if (remoteFinance && !isCancelled) {
+            setFinance(remoteFinance);
+            saveStoredFinance(user.id, remoteFinance);
+          }
+
+          // 6. Fetch remote calendar events
+          const remoteEvents = await fetchCalendarEventsFromSupabase(user.id);
+          if (remoteEvents && remoteEvents.length > 0 && !isCancelled) {
+            setEvents(remoteEvents);
+            saveStoredEvents(user.id, remoteEvents);
+          }
+        } catch (err) {
+          console.warn('[PocketMentor App] Supabase background fetch error:', err);
+        }
+      })();
+    }
+
+    return () => {
+      isCancelled = true;
+    };
   }, [user.id]);
 
   const handleSplashFinish = () => {
@@ -83,6 +180,7 @@ export default function App() {
     };
     setUser(updatedUser);
     saveStoredUser(updatedUser);
+    syncProfileToSupabase(updatedUser);
 
     if (isNewUser) {
       setAppState('onboarding');
@@ -99,12 +197,16 @@ export default function App() {
     };
     setUser(updatedUser);
     saveStoredUser(updatedUser);
+    syncProfileToSupabase(updatedUser);
     setAppState('main');
   };
 
-  // Goal handlers
+  // Goal handlers with optimistic UI + background Supabase sync
   const handleToggleGoal = (id: string) => {
     const today = new Date().toISOString().split('T')[0];
+    let toggledGoal: Goal | null = null;
+    let linkedMilestoneToSync: Milestone | null = null;
+
     const updated = goals.map((g) => {
       if (g.id === id) {
         const nextCompleted = !g.completed;
@@ -113,23 +215,38 @@ export default function App() {
           recordActivity(user.id, today);
         }
 
-        // Auto Tick Milestones (Section 5B & 6):
+        toggledGoal = { ...g, completed: nextCompleted };
+
+        // Auto Tick Milestones:
         // When linked goal is completed, roadmap milestone ticks itself!
         if (g.linkedMilestoneId) {
-          const updatedMilestones = milestones.map((m) =>
-            m.id === g.linkedMilestoneId ? { ...m, completed: nextCompleted } : m
-          );
+          const updatedMilestones = milestones.map((m) => {
+            if (m.id === g.linkedMilestoneId) {
+              const updatedM = { ...m, completed: nextCompleted };
+              linkedMilestoneToSync = updatedM;
+              return updatedM;
+            }
+            return m;
+          });
           setMilestones(updatedMilestones);
           saveStoredMilestones(user.id, updatedMilestones);
         }
 
-        return { ...g, completed: nextCompleted };
+        return toggledGoal;
       }
       return g;
     });
 
     setGoals(updated);
     saveStoredGoals(user.id, updated);
+
+    // Asynchronous Supabase sync
+    if (toggledGoal) {
+      syncGoalUpsert(user.id, toggledGoal);
+    }
+    if (linkedMilestoneToSync) {
+      syncMilestoneUpsert(user.id, linkedMilestoneToSync);
+    }
   };
 
   const handleAddGoal = (title: string, category: GoalCategory, linkedMilestoneId?: string) => {
@@ -145,35 +262,51 @@ export default function App() {
     const updated = [newGoal, ...goals];
     setGoals(updated);
     saveStoredGoals(user.id, updated);
+    syncGoalUpsert(user.id, newGoal);
   };
 
   const handleDeleteGoal = (id: string) => {
     const updated = goals.filter((g) => g.id !== id);
     setGoals(updated);
     saveStoredGoals(user.id, updated);
+    syncGoalDelete(user.id, id);
   };
 
-  // Milestone handlers
+  // Milestone handlers with optimistic UI + background Supabase sync
   const handleToggleMilestone = (id: string) => {
     const today = new Date().toISOString().split('T')[0];
+    let toggledMilestone: Milestone | null = null;
+
     const updated = milestones.map((m) => {
       if (m.id === id) {
         const next = !m.completed;
         if (next) recordActivity(user.id, today);
-        return { ...m, completed: next };
+        toggledMilestone = { ...m, completed: next };
+        return toggledMilestone;
       }
       return m;
     });
     setMilestones(updated);
     saveStoredMilestones(user.id, updated);
+
+    if (toggledMilestone) {
+      syncMilestoneUpsert(user.id, toggledMilestone);
+    }
   };
 
   const handleConvertMilestoneToGoal = (milestone: Milestone) => {
     const today = new Date().toISOString().split('T')[0];
+    const goalId = 'g-' + Date.now();
     // Check if goal already exists for today
     const exists = goals.some((g) => g.linkedMilestoneId === milestone.id && g.date === today);
     if (!exists) {
       handleAddGoal(milestone.title, milestone.category, milestone.id);
+      // Mark convertedToGoalId on milestone
+      const updatedM: Milestone = { ...milestone, convertedToGoalId: goalId };
+      const updatedMilestones = milestones.map((m) => (m.id === milestone.id ? updatedM : m));
+      setMilestones(updatedMilestones);
+      saveStoredMilestones(user.id, updatedMilestones);
+      syncMilestoneUpsert(user.id, updatedM);
     }
   };
 
@@ -181,9 +314,10 @@ export default function App() {
     const updated = { ...user, stage };
     setUser(updated);
     saveStoredUser(updated);
+    syncProfileToSupabase(updated);
   };
 
-  // Journal handler
+  // Journal handler with optimistic UI + background Supabase sync
   const handleSaveJournalEntry = (entry: JournalEntry) => {
     const today = new Date().toISOString().split('T')[0];
     recordActivity(user.id, today);
@@ -196,15 +330,17 @@ export default function App() {
     }
     setJournal(updated);
     saveStoredJournal(user.id, updated);
+    syncJournalUpsert(user.id, entry);
   };
 
-  // Finance handler
+  // Finance handler with optimistic UI + background Supabase sync
   const handleUpdateFinance = (data: FinanceData) => {
     setFinance(data);
     saveStoredFinance(user.id, data);
+    syncFinanceUpsert(user.id, data);
   };
 
-  // Calendar event handlers
+  // Calendar event handlers with optimistic UI + background Supabase sync
   const handleAddEvent = (eventData: Omit<CalendarEvent, 'id'>) => {
     const newEvent: CalendarEvent = {
       ...eventData,
@@ -213,26 +349,37 @@ export default function App() {
     const updated = [newEvent, ...events];
     setEvents(updated);
     saveStoredEvents(user.id, updated);
+    syncCalendarEventUpsert(user.id, newEvent);
   };
 
   const handleToggleEvent = (id: string) => {
-    const updated = events.map((ev) =>
-      ev.id === id ? { ...ev, completed: !ev.completed } : ev
-    );
+    let toggledEvent: CalendarEvent | null = null;
+    const updated = events.map((ev) => {
+      if (ev.id === id) {
+        toggledEvent = { ...ev, completed: !ev.completed };
+        return toggledEvent;
+      }
+      return ev;
+    });
     setEvents(updated);
     saveStoredEvents(user.id, updated);
+    if (toggledEvent) {
+      syncCalendarEventUpsert(user.id, toggledEvent);
+    }
   };
 
   const handleDeleteEvent = (id: string) => {
     const updated = events.filter((ev) => ev.id !== id);
     setEvents(updated);
     saveStoredEvents(user.id, updated);
+    syncCalendarEventDelete(user.id, id);
   };
 
   // User settings
   const handleUpdateUser = (updated: UserProfile) => {
     setUser(updated);
     saveStoredUser(updated);
+    syncProfileToSupabase(updated);
   };
 
   const handleSignOut = () => {

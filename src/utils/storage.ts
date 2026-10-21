@@ -1,4 +1,25 @@
-import { UserProfile, Goal, Milestone, JournalEntry, FinanceData, LifeStage, GoalCategory, CalendarEvent } from '../types';
+import {
+  UserProfile,
+  Goal,
+  Milestone,
+  JournalEntry,
+  FinanceData,
+  LifeStage,
+  GoalCategory,
+  CalendarEvent,
+  ChatMessage,
+} from '../types';
+import {
+  syncProfileToSupabase,
+  syncGoalUpsert,
+  syncMilestoneUpsert,
+  syncJournalUpsert,
+  syncFinanceUpsert,
+  syncCalendarEventUpsert,
+  syncChatMessageUpsert,
+} from './supabase';
+
+export * from './supabase';
 
 export interface RoadmapSubPhase {
   id: string;
@@ -1348,6 +1369,11 @@ export function getStoredUser(): UserProfile {
 
 export function saveStoredUser(user: UserProfile) {
   localStorage.setItem('pocketmentor_user', JSON.stringify(user));
+  // Background asynchronous sync to Supabase (including activity_dates)
+  const activityDates = getStoredActivityDates(user.id);
+  syncProfileToSupabase(user, activityDates).catch((err) => {
+    console.warn('[Storage] Background Supabase user sync error:', err);
+  });
 }
 
 export function getStoredGoals(userId: string): Goal[] {
@@ -1420,6 +1446,28 @@ export function getStoredFinance(userId: string): FinanceData {
 
 export function saveStoredFinance(userId: string, finance: FinanceData) {
   localStorage.setItem(`pocketmentor_finance_${userId}`, JSON.stringify(finance));
+  // Background asynchronous sync to Supabase finance_data
+  syncFinanceUpsert(userId, finance).catch((err) => {
+    console.warn('[Storage] Background Supabase finance sync error:', err);
+  });
+}
+
+// ================= CHAT MESSAGES STORAGE =================
+export function getStoredChatMessages(userId: string): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(`pocketmentor_chat_${userId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    // fallback
+  }
+  return [];
+}
+
+export function saveStoredChatMessages(userId: string, messages: ChatMessage[]) {
+  localStorage.setItem(`pocketmentor_chat_${userId}`, JSON.stringify(messages));
 }
 
 export const INITIAL_EVENTS: CalendarEvent[] = [
@@ -1545,6 +1593,12 @@ export function getStoredActivityDates(userId: string): string[] {
 
   localStorage.setItem(`pocketmentor_activity_${userId}`, JSON.stringify(defaultDates));
   return defaultDates;
+}
+
+export function setStoredActivityDates(userId: string, dates: string[]) {
+  if (Array.isArray(dates) && dates.length > 0) {
+    localStorage.setItem(`pocketmentor_activity_${userId}`, JSON.stringify(dates));
+  }
 }
 
 export function recordActivity(userId: string, dateStr?: string) {

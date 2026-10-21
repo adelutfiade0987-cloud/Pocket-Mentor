@@ -11,8 +11,10 @@ import {
   Compass,
   MapPin,
   Save,
+  Database,
 } from 'lucide-react';
 import { UserProfile, LifeStage } from '../types';
+import { isSupabaseConfigured } from '../utils/supabase';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -216,8 +218,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
+          {/* Database Synchronization Status */}
+          <div className="p-3 rounded-2xl bg-[#F5F5F9] border border-black/[0.05] flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                isSupabaseConfigured() ? 'bg-[#3FB876]/15 text-[#3FB876]' : 'bg-[#FFB020]/15 text-[#FFB020]'
+              }`}>
+                <Database className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <h4 className="text-xs font-bold text-[#1A1A2E]">Sinkronisasi Supabase</h4>
+                  <span className={`w-2 h-2 rounded-full ${
+                    isSupabaseConfigured() ? 'bg-[#3FB876] animate-pulse' : 'bg-[#FFB020]'
+                  }`} />
+                </div>
+                <p className="text-[10px] text-[#6B7280]">
+                  {isSupabaseConfigured()
+                    ? 'Cloud sync aktif (Auto-sync 7 tabel: profiles, goals, milestones, journal, finance, calendar, chat)'
+                    : 'Mode Offline (Penyimpanan instan via localStorage fallback)'}
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Save Button */}
-          <div className="pt-3">
+          <div className="pt-2">
             <button
               type="submit"
               className="w-full h-12 rounded-2xl bg-[#6C5CE7] hover:bg-[#5b4bc7] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"

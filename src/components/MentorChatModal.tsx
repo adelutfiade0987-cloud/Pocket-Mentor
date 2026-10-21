@@ -14,6 +14,13 @@ import {
 } from 'lucide-react';
 import { UserProfile, ChatMessage } from '../types';
 import { playTextToSpeech, stopAudioPlayback } from '../utils/tts';
+import {
+  getStoredChatMessages,
+  saveStoredChatMessages,
+  syncChatMessageUpsert,
+  fetchChatMessagesFromSupabase,
+  isSupabaseConfigured,
+} from '../utils/storage';
 
 interface MentorChatModalProps {
   isOpen: boolean;
@@ -149,14 +156,18 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
 }) => {
   const stageConfig = getStageChatConfig(user);
 
-  const [messages, setMessages] = useState<ChatMessage[]>(() => [
-    {
-      id: 'm-init',
-      role: 'model',
-      content: stageConfig.initialGreeting,
-      timestamp: 'Baru saja',
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    const stored = getStoredChatMessages(user.id);
+    if (stored.length > 0) return stored;
+    return [
+      {
+        id: 'm-init',
+        role: 'model',
+        content: stageConfig.initialGreeting,
+        timestamp: 'Baru saja',
+      },
+    ];
+  });
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [modelChoice, setModelChoice] = useState<'fast' | 'general' | 'complex'>('general');
@@ -168,17 +179,37 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Reconcile and fetch remote chat history from Supabase on open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (isSupabaseConfigured() && user.id) {
+      fetchChatMessagesFromSupabase(user.id)
+        .then((remoteMsgs) => {
+          if (remoteMsgs && remoteMsgs.length > 0) {
+            setMessages(remoteMsgs);
+            saveStoredChatMessages(user.id, remoteMsgs);
+          }
+        })
+        .catch((err) => {
+          console.warn('[MentorChatModal] Remote chat fetch error:', err);
+        });
+    }
+  }, [isOpen, user.id]);
+
   // Sync initial message when user stage changes if no custom conversation has taken place
   useEffect(() => {
     if (messages.length <= 1) {
-      setMessages([
+      const initialMsgs: ChatMessage[] = [
         {
           id: 'm-init',
           role: 'model',
           content: stageConfig.initialGreeting,
           timestamp: 'Baru saja',
         },
-      ]);
+      ];
+      setMessages(initialMsgs);
+      saveStoredChatMessages(user.id, initialMsgs);
     }
   }, [user.stage, user.name]);
 
@@ -201,6 +232,10 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
 
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
+    saveStoredChatMessages(user.id, newMessages);
+    // Background async Supabase sync
+    syncChatMessageUpsert(user.id, userMsg);
+
     setInputText('');
     setLoading(true);
 
@@ -234,7 +269,11 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
         content: replyText,
         timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
       };
-      setMessages((prev) => [...prev, modelMsg]);
+      const updatedMessages = [...newMessages, modelMsg];
+      setMessages(updatedMessages);
+      saveStoredChatMessages(user.id, updatedMessages);
+      // Background async Supabase sync
+      syncChatMessageUpsert(user.id, modelMsg);
     } catch (err) {
       console.warn('Chat request fallback:', err);
       const fallbackMsg: ChatMessage = {
@@ -244,7 +283,10 @@ export const MentorChatModal: React.FC<MentorChatModalProps> = ({
           'Aku mengerti kegelisahanmu saat ini. Di masa transisi, wajar sekali merasa bimbang antara kampus impian dan jurusan yang tepat. Apa opsi terbesar yang lagi kamu timbang sekarang?',
         timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
       };
-      setMessages((prev) => [...prev, fallbackMsg]);
+      const updatedMessages = [...newMessages, fallbackMsg];
+      setMessages(updatedMessages);
+      saveStoredChatMessages(user.id, updatedMessages);
+      syncChatMessageUpsert(user.id, fallbackMsg);
     } finally {
       setLoading(false);
     }
