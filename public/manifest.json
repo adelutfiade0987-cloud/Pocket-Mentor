@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "PocketMentor - Panduan Masa Depan",
+  "short_name": "PocketMentor",
+  "description": "A mentor that fits in your pocket — roadmap berjenjang, kebiasaan harian, dan panduan AI untuk transisi hidupmu.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F5F5F9",
+  "theme_color": "#6C5CE7",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

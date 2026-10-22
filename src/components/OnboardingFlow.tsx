@@ -29,28 +29,27 @@ const FOCUS_CHIPS = [
   'Content creation / personal brand',
 ];
 
-export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ initialName = 'Teman Baru', onComplete }) => {
+export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ initialName = '', onComplete }) => {
   const [step, setStep] = useState(1);
   const totalSteps = 10;
   const [curtainActive, setCurtainActive] = useState(false);
 
-  // Form State
-  const [name, setName] = useState(initialName);
-  const [origin, setOrigin] = useState('Bandung');
+  // Form State - Cleaned for individual trial users
+  const [name, setName] = useState(initialName || '');
+  const [origin, setOrigin] = useState('');
   const [stage, setStage] = useState<LifeStage>('Semester 7');
   const [collegeSemester, setCollegeSemester] = useState<number>(7);
-  const [major, setMajor] = useState('Ilmu Komunikasi');
+  const [major, setMajor] = useState('');
   const [currentRole, setCurrentRole] = useState('');
   const [industry, setIndustry] = useState('');
-  const [interests, setInterests] = useState<string[]>(['Penulisan & Content', 'Digital Marketing']);
+  const [interests, setInterests] = useState<string[]>([]);
   const [customInterest, setCustomInterest] = useState('');
-  const [careerDirection, setCareerDirection] = useState('Creative Strategist di Startup');
-  const [desiredContribution, setDesiredContribution] = useState('Dibutuhkan sebagai problem solver kreatif yang solutif');
-  const [targetDestination, setTargetDestination] = useState('Jakarta / Remote');
+  const [careerDirection, setCareerDirection] = useState('');
+  const [desiredContribution, setDesiredContribution] = useState('');
+  const [targetDestination, setTargetDestination] = useState('');
   const [focusAreas, setFocusAreas] = useState<string[]>([
     'Career & job prep',
     'Daily habits & goals',
-    'Journaling & reflection',
   ]);
 
   const toggleInterest = (item: string) => {
@@ -180,7 +179,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ initialName = 'T
               className="space-y-4"
             >
               <h2 className="text-2xl font-bold tracking-tight text-[#1A1A2E]">
-                Hai {name}, senang kamu ada di sini.
+                Hai {name ? name : 'Teman Baru'}, senang kamu ada di sini.
               </h2>
               <p className="text-sm text-[#6B7280]">
                 PocketMentor dirancang untuk jadi teman diskusi yang paham betul fase hidupmu. Mau kita panggil dengan nama apa?
@@ -269,8 +268,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ initialName = 'T
                     color: 'hover:border-[#FFB020]',
                   },
                   {
-                    id: 'Semester 7',
-                    title: 'Kuliah (Pilih semester nanti)',
+                    id: 'college',
+                    title: 'Sedang Kuliah (Pilih semester di langkah berikutnya)',
                     desc: 'Menavigasi mata kuliah, organisasi, magang, atau skripsi.',
                     color: 'hover:border-[#6C5CE7]',
                   },
@@ -280,28 +279,42 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ initialName = 'T
                     desc: 'Fokus finansial, adaptasi kerja, dan jenjang karier.',
                     color: 'hover:border-[#3FB876]',
                   },
-                ].map((item) => (
-                  <motion.button
-                    key={item.id}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setStage(item.id as LifeStage)}
-                    className={`w-full p-4 rounded-2xl text-left border transition-all ${
-                      stage === item.id
-                        ? 'border-[#6C5CE7] bg-white shadow-sm ring-2 ring-[#6C5CE7]/20'
-                        : `border-black/[0.06] bg-white ${item.color}`
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-sm text-[#1A1A2E]">{item.title}</h3>
-                      {stage === item.id && (
-                        <div className="w-5 h-5 rounded-full bg-[#6C5CE7] text-white flex items-center justify-center">
-                          <Check className="w-3 h-3 stroke-[3]" />
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs text-[#6B7280] mt-1">{item.desc}</p>
-                  </motion.button>
-                ))}
+                ].map((item) => {
+                  const isSelected = item.id === 'college'
+                    ? stage.includes('Semester')
+                    : stage === item.id;
+                  return (
+                    <motion.button
+                      key={item.id}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        if (item.id === 'college') {
+                          if (!stage.includes('Semester')) {
+                            setStage('Semester 7');
+                            setCollegeSemester(7);
+                          }
+                        } else {
+                          setStage(item.id as LifeStage);
+                        }
+                      }}
+                      className={`w-full p-4 rounded-2xl text-left border transition-all ${
+                        isSelected
+                          ? 'border-[#6C5CE7] bg-white shadow-sm ring-2 ring-[#6C5CE7]/20'
+                          : `border-black/[0.06] bg-white ${item.color}`
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-sm text-[#1A1A2E]">{item.title}</h3>
+                        {isSelected && (
+                          <div className="w-5 h-5 rounded-full bg-[#6C5CE7] text-white flex items-center justify-center">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-[#6B7280] mt-1">{item.desc}</p>
+                    </motion.button>
+                  );
+                })}
               </div>
             </motion.div>
           )}

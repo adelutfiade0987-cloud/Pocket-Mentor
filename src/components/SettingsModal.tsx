@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, LifeStage } from '../types';
 import { isSupabaseConfigured } from '../utils/supabase';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -240,6 +241,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* PWA Home Screen Installation Option */}
+          <div className="pt-1">
+            <PWAInstallButton variant="card" />
           </div>
 
           {/* Save Button */}

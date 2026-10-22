@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="pGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7C6DF2"/>
+      <stop offset="100%" stop-color="#5544DF"/>
+    </linearGradient>
+  </defs>
+  <!-- Background with smooth rounded squircle corners -->
+  <rect width="512" height="512" rx="128" fill="url(#pGrad)"/>
+  
+  <!-- Outer glowing ring -->
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="12"/>
+  
+  <!-- Compass dial marks -->
+  <circle cx="256" cy="96" r="8" fill="#FFFFFF" fill-opacity="0.8"/>
+  <circle cx="256" cy="416" r="8" fill="#FFFFFF" fill-opacity="0.8"/>
+  <circle cx="96" cy="256" r="8" fill="#FFFFFF" fill-opacity="0.8"/>
+  <circle cx="416" cy="256" r="8" fill="#FFFFFF" fill-opacity="0.8"/>
+  
+  <!-- Compass Needle (North in bright coral/white and South in translucent white) -->
+  <path d="M256 128 L304 256 L256 240 Z" fill="#FFFFFF"/>
+  <path d="M256 128 L208 256 L256 240 Z" fill="#FA5A50"/>
+  
+  <path d="M256 384 L304 256 L256 272 Z" fill="#FFFFFF" fill-opacity="0.75"/>
+  <path d="M256 384 L208 256 L256 272 Z" fill="#FFFFFF" fill-opacity="0.5"/>
+  
+  <!-- Center Pivot Pin -->
+  <circle cx="256" cy="256" r="20" fill="#FFFFFF" stroke="#5544DF" stroke-width="6"/>
+  <circle cx="256" cy="256" r="6" fill="#6C5CE7"/>
+</svg>

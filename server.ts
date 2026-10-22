@@ -25,6 +25,59 @@ const ai = new GoogleGenAI({
   },
 });
 
+// In-memory IP rate limiter: max 40 requests per hour per IP (protects Gemini quota for 50 trial users)
+interface RateLimitRecord {
+  count: number;
+  resetTime: number;
+}
+const ipRateLimits = new Map<string, RateLimitRecord>();
+const RATE_LIMIT_MAX = 40;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour window
+
+const apiRateLimiter: express.RequestHandler = (req, res, next) => {
+  const forwarded = req.headers['x-forwarded-for'];
+  const ip =
+    typeof forwarded === 'string'
+      ? forwarded.split(',')[0].trim()
+      : (req.socket.remoteAddress || 'unknown-client');
+
+  const now = Date.now();
+  const record = ipRateLimits.get(ip);
+
+  if (!record || now > record.resetTime) {
+    ipRateLimits.set(ip, {
+      count: 1,
+      resetTime: now + RATE_LIMIT_WINDOW_MS,
+    });
+    return next();
+  }
+
+  if (record.count >= RATE_LIMIT_MAX) {
+    const remainingSeconds = Math.ceil((record.resetTime - now) / 1000);
+    const remainingMinutes = Math.ceil(remainingSeconds / 60);
+    return res.status(429).json({
+      success: false,
+      error: `Batas kuota penggunaan AI tercapai (maks 40 permintaan/jam per perangkat). Silakan coba lagi dalam ${remainingMinutes} menit.`,
+      retryAfterSeconds: remainingSeconds,
+    });
+  }
+
+  record.count += 1;
+  next();
+};
+
+// Periodic cleanup of expired rate limit entries every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, rec] of ipRateLimits.entries()) {
+    if (now > rec.resetTime) {
+      ipRateLimits.delete(ip);
+    }
+  }
+}, 10 * 60 * 1000);
+
+app.use('/api', apiRateLimiter);
+
 // Endpoint 1: Personalized Stage-Aware Daily Mentor Tip
 app.post('/api/mentor/tip', async (req, res) => {
   try {

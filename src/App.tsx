@@ -164,7 +164,7 @@ export default function App() {
   }, [user.id]);
 
   const handleSplashFinish = () => {
-    if (user && user.onboarded) {
+    if (user && user.id && user.id !== 'user_default' && user.onboarded) {
       setAppState('main');
     } else {
       setAppState('intro');
@@ -383,6 +383,8 @@ export default function App() {
   };
 
   const handleSignOut = () => {
+    localStorage.removeItem('pocketmentor_user');
+    setUser(DEFAULT_USER);
     setIsSettingsOpen(false);
     setAppState('login');
   };

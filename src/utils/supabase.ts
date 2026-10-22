@@ -95,6 +95,23 @@ export async function syncProfileToSupabase(
   }
 }
 
+/**
+ * Generates a deterministic, unique user ID from an email address (e.g. usr_john_doe_gmail_com_9a8f)
+ * to avoid data conflicts among 50 testing users.
+ */
+export function generateUserIdFromEmail(email: string): string {
+  const clean = (email || '').trim().toLowerCase();
+  if (!clean) return `usr_${Date.now()}`;
+  const sanitized = clean.replace(/[^a-z0-9]/g, '_').slice(0, 32);
+  let hash = 0;
+  for (let i = 0; i < clean.length; i++) {
+    hash = (hash << 5) - hash + clean.charCodeAt(i);
+    hash |= 0;
+  }
+  const hashStr = Math.abs(hash).toString(36);
+  return `usr_${sanitized}_${hashStr}`;
+}
+
 export async function fetchProfileFromSupabase(
   userId: string
 ): Promise<{ profile: Partial<UserProfile>; activityDates?: string[] } | null> {
@@ -138,6 +155,58 @@ export async function fetchProfileFromSupabase(
     return { profile, activityDates };
   } catch (err) {
     console.warn('[PocketMentor Supabase] fetchProfileFromSupabase exception:', err);
+    return null;
+  }
+}
+
+/**
+ * Searches for a user profile in Supabase by email or deterministic ID.
+ */
+export async function fetchProfileByEmailFromSupabase(
+  email: string
+): Promise<{ profile: Partial<UserProfile>; activityDates?: string[] } | null> {
+  if (!supabase) return null;
+  const cleanEmail = (email || '').trim().toLowerCase();
+  if (!cleanEmail) return null;
+
+  try {
+    // 1. First try matching email directly
+    const { data: byEmail, error: emailErr } = await supabase
+      .from('profiles')
+      .select('*')
+      .ilike('email', cleanEmail)
+      .maybeSingle();
+
+    if (byEmail && !emailErr) {
+      const profile: Partial<UserProfile> = {
+        id: byEmail.id,
+        name: byEmail.name,
+        email: byEmail.email,
+        avatarUrl: byEmail.avatar_url || undefined,
+        origin: byEmail.origin,
+        stage: byEmail.stage,
+        collegeSemester: byEmail.college_semester ?? undefined,
+        major: byEmail.major || '',
+        currentRole: byEmail.current_role || '',
+        industry: byEmail.industry || '',
+        interests: Array.isArray(byEmail.interests) ? byEmail.interests : [],
+        careerDirection: byEmail.career_direction || '',
+        desiredContribution: byEmail.desired_contribution || '',
+        targetDestination: byEmail.target_destination || '',
+        focusAreas: Array.isArray(byEmail.focus_areas) ? byEmail.focus_areas : [],
+        reminderTime: byEmail.reminder_time || '20:00',
+        bannerNotifications: byEmail.banner_notifications ?? true,
+        onboarded: byEmail.onboarded ?? true,
+      };
+      const activityDates = Array.isArray(byEmail.activity_dates) ? byEmail.activity_dates : undefined;
+      return { profile, activityDates };
+    }
+
+    // 2. Fallback: match by generated deterministic ID
+    const generatedId = generateUserIdFromEmail(cleanEmail);
+    return await fetchProfileFromSupabase(generatedId);
+  } catch (err) {
+    console.warn('[PocketMentor Supabase] fetchProfileByEmailFromSupabase exception:', err);
     return null;
   }
 }

@@ -1265,21 +1265,21 @@ export const INITIAL_GOALS: Goal[] = [
   {
     id: 'g-1',
     title: 'Tulis 500 kata Bab 2 Skripsi',
-    completed: true,
+    completed: false,
     category: 'study',
     date: new Date().toISOString().split('T')[0],
   },
   {
     id: 'g-2',
     title: 'Perbarui 1 studi kasus di CV & LinkedIn',
-    completed: true,
+    completed: false,
     category: 'career',
     date: new Date().toISOString().split('T')[0],
   },
   {
     id: 'g-3',
     title: 'Jalan santai / peregangan 15 menit',
-    completed: true,
+    completed: false,
     category: 'health',
     date: new Date().toISOString().split('T')[0],
   },
@@ -1306,16 +1306,7 @@ export const INITIAL_GOALS: Goal[] = [
   },
 ];
 
-export const INITIAL_JOURNAL_ENTRIES: JournalEntry[] = [
-  {
-    id: 'j-1',
-    date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-    prompt: 'Apa satu hal yang berjalan lancar hari ini, dan apa yang bisa kamu syukuri?',
-    content: 'Hari ini sempat bimbingan dengan dosen pembimbing. Sempat cemas revisinya banyak, ternyata responsnya positif dan cuma perlu tambahkan data kuantitatif di Bab 3. Lega rasanya ada arah yang jelas.',
-    mood: 'great',
-    updatedAt: new Date(Date.now() - 86400000).toISOString(),
-  },
-];
+export const INITIAL_JOURNAL_ENTRIES: JournalEntry[] = [];
 
 export const INITIAL_FINANCE: FinanceData = {
   monthlyIncome: 3500000,
@@ -1337,37 +1328,44 @@ export const ROTATING_PROMPTS = [
 ];
 
 export const DEFAULT_USER: UserProfile = {
-  id: 'user_default',
-  name: 'Dimas Pratama',
-  email: 'dimas.pratama@gmail.com',
+  id: '',
+  name: '',
+  email: '',
   avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-  origin: 'Bandung',
+  origin: '',
   stage: 'Semester 7',
   collegeSemester: 7,
-  major: 'Ilmu Komunikasi & Media Digital',
+  major: '',
   currentRole: '',
-  industry: 'Media & Tech',
-  interests: ['Penulisan Kreatif', 'Desain UI/UX', 'Content Creation', 'Manajemen Waktu'],
-  careerDirection: 'Creative Strategist di Startup / Agensi Digital',
-  desiredContribution: 'Membantu brand dan kreator menyampaikan cerita yang otentik dan berdampak',
-  targetDestination: 'Jakarta / Remote',
-  focusAreas: ['Career & job prep', 'Daily habits & goals', 'Journaling & reflection'],
+  industry: '',
+  interests: [],
+  careerDirection: '',
+  desiredContribution: '',
+  targetDestination: '',
+  focusAreas: ['Career & job prep', 'Daily habits & goals'],
   reminderTime: '20:00',
   bannerNotifications: true,
-  onboarded: true,
+  onboarded: false,
 };
 
 export function getStoredUser(): UserProfile {
   try {
     const raw = localStorage.getItem('pocketmentor_user');
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.id && parsed.id !== 'user_default') {
+        return parsed;
+      }
+    }
   } catch (e) {
     // fallback
   }
+  localStorage.removeItem('pocketmentor_user');
   return DEFAULT_USER;
 }
 
 export function saveStoredUser(user: UserProfile) {
+  if (!user.id) return;
   localStorage.setItem('pocketmentor_user', JSON.stringify(user));
   // Background asynchronous sync to Supabase (including activity_dates)
   const activityDates = getStoredActivityDates(user.id);
@@ -1558,41 +1556,36 @@ export interface StreakInfo {
 }
 
 export function getStoredActivityDates(userId: string): string[] {
+  if (!userId || userId === 'user_default') return [];
   try {
     const raw = localStorage.getItem(`pocketmentor_activity_${userId}`);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (e) {
     // fallback
   }
 
-  // Seed default 6 days prior to today for consistent demo streak
+  // Check if user has completed goals or journals today
   const today = new Date();
-  const defaultDates: string[] = [];
-  for (let i = 6; i >= 1; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    defaultDates.push(d.toISOString().split('T')[0]);
-  }
-  // If user already has goals completed today, add today too
-  const goalsRaw = localStorage.getItem(`pocketmentor_goals_${userId}`);
   const todayStr = today.toISOString().split('T')[0];
+  const userDates: string[] = [];
+
+  const goalsRaw = localStorage.getItem(`pocketmentor_goals_${userId}`);
   if (goalsRaw) {
     try {
       const goals: Goal[] = JSON.parse(goalsRaw);
-      if (goals.some((g) => g.date === todayStr && g.completed)) {
-        defaultDates.push(todayStr);
-      }
+      goals.forEach((g) => {
+        if (g.completed && g.date && !userDates.includes(g.date)) {
+          userDates.push(g.date);
+        }
+      });
     } catch {}
-  } else {
-    // Default has completed goals today
-    defaultDates.push(todayStr);
   }
 
-  localStorage.setItem(`pocketmentor_activity_${userId}`, JSON.stringify(defaultDates));
-  return defaultDates;
+  localStorage.setItem(`pocketmentor_activity_${userId}`, JSON.stringify(userDates));
+  return userDates;
 }
 
 export function setStoredActivityDates(userId: string, dates: string[]) {
