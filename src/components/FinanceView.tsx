@@ -72,7 +72,8 @@ export const FinanceView: React.FC<FinanceViewProps> = ({ finance, onUpdateFinan
           <input
             type="number"
             step="100000"
-            value={income}
+            value={income === 0 ? '' : income}
+            placeholder="0 (Belum ada pemasukan yang direncanakan)"
             onChange={(e) => {
               const val = Math.max(0, parseInt(e.target.value, 10) || 0);
               setIncome(val);
@@ -83,6 +84,12 @@ export const FinanceView: React.FC<FinanceViewProps> = ({ finance, onUpdateFinan
             IDR
           </span>
         </div>
+
+        {income === 0 && (
+          <p className="text-[11px] text-[#6C5CE7] font-medium mb-3">
+            💡 Masukkan perkiraan uang saku/gaji bulanan kamu atau pilih preset di bawah:
+          </p>
+        )}
 
         {/* Quick Amount presets */}
         <div className="flex flex-wrap gap-1.5">
@@ -224,10 +231,10 @@ export const FinanceView: React.FC<FinanceViewProps> = ({ finance, onUpdateFinan
           <input
             type="number"
             step="100000"
-            value={emergencyCurrent}
+            value={emergencyCurrent === 0 ? '' : emergencyCurrent}
             onChange={(e) => setEmergencyCurrent(Math.max(0, parseInt(e.target.value, 10) || 0))}
             className="flex-1 px-3 py-2 bg-[#F5F5F9] rounded-xl text-xs font-bold text-[#1A1A2E] focus:outline-none"
-            placeholder="Perbarui saldo darurat..."
+            placeholder="0 (Belum ada saldo darurat...)"
           />
           <button
             type="button"

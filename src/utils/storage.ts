@@ -298,7 +298,7 @@ export const INITIAL_MILESTONES: Milestone[] = [
     title: 'Audit minat & gaya belajar mandiri',
     description: 'Kenali apakah kamu tipe visual, auditori, atau kinestetik untuk menentukan ritme belajar yang paling efisien.',
     category: 'study',
-    completed: true,
+    completed: false,
   },
   {
     id: 'm-sma1-2',
@@ -308,7 +308,7 @@ export const INITIAL_MILESTONES: Milestone[] = [
     title: 'Eksplorasi ekstrakurikuler kepemimpinan atau teknologi',
     description: 'Pilih 1 ekskul yang mengasah soft skill atau skill digital sejak dini (OSIS, KIR, Robotik, atau Multimedia).',
     category: 'career',
-    completed: true,
+    completed: false,
   },
   {
     id: 'm-sma1-3',
@@ -340,7 +340,7 @@ export const INITIAL_MILESTONES: Milestone[] = [
     title: 'Tentukan fokus peminatan (IPA, IPS, atau Kejuruan) secara mantap',
     description: 'Pilih mata pelajaran peminatan yang linear dengan rencana program studi impian di perguruan tinggi.',
     category: 'study',
-    completed: true,
+    completed: false,
   },
   {
     id: 'm-sma2-2',
@@ -552,7 +552,7 @@ export const INITIAL_MILESTONES: Milestone[] = [
     title: 'Adaptasi sistem SKS, portal kampus & gaya belajar mandiri',
     description: 'Pahami silabus mata kuliah, bobot penilaian tugas, dan aturan presensi minimal 75-80%.',
     category: 'study',
-    completed: true,
+    completed: false,
   },
   {
     id: 'm-s1-2',
@@ -562,7 +562,7 @@ export const INITIAL_MILESTONES: Milestone[] = [
     title: 'Targetkan IPK awal > 3.50 sebagai bantalan akademik',
     description: 'Mata kuliah dasar umum (MKDU) semester awal relatif mudah dimaksimalkan untuk modal semester atas.',
     category: 'study',
-    completed: true,
+    completed: false,
   },
   {
     id: 'm-s1-3',
@@ -572,7 +572,7 @@ export const INITIAL_MILESTONES: Milestone[] = [
     title: 'Eksplorasi 1–2 organisasi kampus atau UKM yang relevan',
     description: 'Fokus pada pembangunan relasi dan soft skill komunikasi tanpa mengambil beban jabatan berat dulu.',
     category: 'career',
-    completed: true,
+    completed: false,
   },
   {
     id: 'm-s1-4',
@@ -594,7 +594,7 @@ export const INITIAL_MILESTONES: Milestone[] = [
     title: 'Pertahankan stabilitas IPK & rapikan catatan digital',
     description: 'Gunakan Notion, Obsidian, atau Google Drive dengan folder rapi per mata kuliah.',
     category: 'study',
-    completed: true,
+    completed: false,
   },
   {
     id: 'm-s2-2',
@@ -604,7 +604,7 @@ export const INITIAL_MILESTONES: Milestone[] = [
     title: 'Perluas relasi lintas jurusan & networking kakak tingkat',
     description: 'Dapatkan bank soal ujian tahun lalu dan tips menghadapi dosen dari senior terpercaya.',
     category: 'career',
-    completed: true,
+    completed: false,
   },
   {
     id: 'm-s2-3',
@@ -636,7 +636,7 @@ export const INITIAL_MILESTONES: Milestone[] = [
     title: 'Ambil peran kepanitiaan / divisi inti di organisasi',
     description: 'Latih kemampuan memimpin rapat, manajemen waktu, dan problem solving tim nyata.',
     category: 'career',
-    completed: true,
+    completed: false,
   },
   {
     id: 'm-s3-2',
@@ -1261,61 +1261,18 @@ export const INITIAL_MILESTONES: Milestone[] = [
   },
 ];
 
-export const INITIAL_GOALS: Goal[] = [
-  {
-    id: 'g-1',
-    title: 'Tulis 500 kata Bab 2 Skripsi',
-    completed: false,
-    category: 'study',
-    date: new Date().toISOString().split('T')[0],
-  },
-  {
-    id: 'g-2',
-    title: 'Perbarui 1 studi kasus di CV & LinkedIn',
-    completed: false,
-    category: 'career',
-    date: new Date().toISOString().split('T')[0],
-  },
-  {
-    id: 'g-3',
-    title: 'Jalan santai / peregangan 15 menit',
-    completed: false,
-    category: 'health',
-    date: new Date().toISOString().split('T')[0],
-  },
-  {
-    id: 'g-4',
-    title: 'Catat pemasukan & pengeluaran hari ini',
-    completed: false,
-    category: 'finance',
-    date: new Date().toISOString().split('T')[0],
-  },
-  {
-    id: 'g-5',
-    title: 'Riset 3 jurnal acuan metodologi penelitian',
-    completed: false,
-    category: 'study',
-    date: new Date().toISOString().split('T')[0],
-  },
-  {
-    id: 'g-6',
-    title: 'Draft ide postingan edukasi di media sosial',
-    completed: false,
-    category: 'content',
-    date: new Date().toISOString().split('T')[0],
-  },
-];
+export const INITIAL_GOALS: Goal[] = [];
 
 export const INITIAL_JOURNAL_ENTRIES: JournalEntry[] = [];
 
 export const INITIAL_FINANCE: FinanceData = {
-  monthlyIncome: 3500000,
+  monthlyIncome: 0,
   currency: 'IDR',
   needsPercent: 50,
   wantsPercent: 30,
   savingsPercent: 20,
   emergencyFundTargetMonths: 3,
-  emergencyFundCurrent: 2100000,
+  emergencyFundCurrent: 0,
 };
 
 export const ROTATING_PROMPTS = [
@@ -1380,6 +1337,7 @@ export function saveStoredUser(user: UserProfile) {
 
 export function getStoredGoals(userId: string): Goal[] {
   try {
+    if (!userId || userId === 'user_default') return [];
     const raw = localStorage.getItem(`pocketmentor_goals_${userId}`);
     if (raw) return JSON.parse(raw);
   } catch (e) {
@@ -1394,6 +1352,9 @@ export function saveStoredGoals(userId: string, goals: Goal[]) {
 
 export function getStoredMilestones(userId: string): Milestone[] {
   try {
+    if (!userId || userId === 'user_default') {
+      return INITIAL_MILESTONES.map((m) => ({ ...m, completed: false }));
+    }
     const raw = localStorage.getItem(`pocketmentor_milestones_${userId}`);
     if (raw) {
       const parsed: Milestone[] = JSON.parse(raw);
@@ -1407,7 +1368,7 @@ export function getStoredMilestones(userId: string): Milestone[] {
 
       const upgraded = INITIAL_MILESTONES.map((m) => ({
         ...m,
-        completed: oldCompletedIds.has(m.id) || oldCompletedTitles.has(m.title.toLowerCase()) || m.completed,
+        completed: oldCompletedIds.has(m.id) || oldCompletedTitles.has(m.title.toLowerCase()),
       }));
       saveStoredMilestones(userId, upgraded);
       return upgraded;
@@ -1472,66 +1433,11 @@ export function saveStoredChatMessages(userId: string, messages: ChatMessage[]) 
   localStorage.setItem(`pocketmentor_chat_${userId}`, JSON.stringify(messages));
 }
 
-export const INITIAL_EVENTS: CalendarEvent[] = [
-  {
-    id: 'ev-1',
-    title: 'Bimbingan Bab 2 Skripsi & Metodologi',
-    date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-    time: '14:00',
-    location: 'Ruang Dosen / Lab Komunikasi',
-    urgency: 'penting',
-    type: 'skripsi',
-    description: 'Siapkan draft Bab 2 dan lembar catatan bimbingan revisi.',
-    completed: false,
-  },
-  {
-    id: 'ev-2',
-    title: 'Deadline Revisi Proposal Skripsi',
-    date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-    time: '23:59',
-    location: 'Portal Kampus (SIAKAD)',
-    urgency: 'urgent',
-    type: 'skripsi',
-    description: 'Pastikan format sitasi APA 7th edition dan cek similarity Turnitin.',
-    completed: false,
-  },
-  {
-    id: 'ev-3',
-    title: 'Kirim Portofolio ke 2 Agensi Digital',
-    date: new Date(Date.now() + 86400000 * 4).toISOString().split('T')[0],
-    time: '10:00',
-    location: 'Email / LinkedIn InMail',
-    urgency: 'karir',
-    type: 'magang',
-    description: 'Kirim cover letter ringkas beserta live portfolio link Notion.',
-    completed: false,
-  },
-  {
-    id: 'ev-4',
-    title: 'Tugas Analisis Studi Kasus Media Sosial',
-    date: new Date(Date.now() + 86400000 * 6).toISOString().split('T')[0],
-    time: '17:00',
-    location: 'Google Classroom',
-    urgency: 'sebentar_lagi',
-    type: 'tugas',
-    description: 'Analisis kampanye brand lokal dan buat slide ringkasan 5 halaman.',
-    completed: false,
-  },
-  {
-    id: 'ev-5',
-    title: 'Sidang Seminar Proposal (Sempro)',
-    date: new Date(Date.now() + 86400000 * 14).toISOString().split('T')[0],
-    time: '09:30',
-    location: 'Auditorium Kampus Gedung C',
-    urgency: 'masih_lama',
-    type: 'ujian',
-    description: 'Presentasi 15 menit di hadapan 2 dosen penguji.',
-    completed: false,
-  },
-];
+export const INITIAL_EVENTS: CalendarEvent[] = [];
 
 export function getStoredEvents(userId: string): CalendarEvent[] {
   try {
+    if (!userId || userId === 'user_default') return [];
     const raw = localStorage.getItem(`pocketmentor_events_${userId}`);
     if (raw) return JSON.parse(raw);
   } catch (e) {
