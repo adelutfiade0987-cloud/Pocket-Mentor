@@ -1331,7 +1331,7 @@ export const DEFAULT_USER: UserProfile = {
   id: '',
   name: '',
   email: '',
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+  avatarUrl: '',
   origin: '',
   stage: 'Semester 7',
   collegeSemester: 7,
@@ -1354,6 +1354,10 @@ export function getStoredUser(): UserProfile {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.id && parsed.id !== 'user_default') {
+        // Clean out legacy unsplash stock photos if present
+        if (parsed.avatarUrl && parsed.avatarUrl.includes('unsplash.com')) {
+          parsed.avatarUrl = '';
+        }
         return parsed;
       }
     }

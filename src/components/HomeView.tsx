@@ -24,10 +24,12 @@ import {
   Target,
   Clock,
   Info,
+  User as UserIcon,
 } from 'lucide-react';
 import { UserProfile, Goal, Milestone, JournalEntry, FinanceData, CalendarEvent, GoalCategory } from '../types';
 import { playTextToSpeech, stopAudioPlayback } from '../utils/tts';
 import { calculateStreak, recordActivity } from '../utils/storage';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HomeViewProps {
   user: UserProfile;
@@ -224,15 +226,19 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <button
             type="button"
             onClick={onOpenSettings}
-            className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-xs ring-2 ring-[#6C5CE7]/30 hover:scale-105 transition-all"
+            className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-xs ring-2 ring-[#6C5CE7]/30 hover:scale-105 transition-all flex items-center justify-center bg-[#E4E4EE]"
             title="Profil & Pengaturan"
           >
-            <img
-              src={user.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
-              alt={user.name}
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
+            {user.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name || 'User'}
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <UserIcon className="w-5 h-5 text-[#6B7280]" />
+            )}
           </button>
         </div>
       </header>
@@ -300,6 +306,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <span className="text-[10px] text-[#6B7280]">Roadmap aktif</span>
         </div>
       </div>
+
+      {/* PWA Mobile App Installation Prompt (Suppresses automatically if already installed) */}
+      <PWAInstallButton variant="card" className="mb-4" />
 
       {/* ================= MORNING KICKOFF BANNER (Flexible, Stage-Aware & Dynamic) ================= */}
       <AnimatePresence>

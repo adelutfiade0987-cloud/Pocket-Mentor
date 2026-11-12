@@ -42,6 +42,11 @@ import {
   syncCalendarEventDelete,
   fetchCalendarEventsFromSupabase,
 } from './utils/storage';
+import {
+  supabase,
+  generateUserIdFromEmail,
+  fetchProfileByEmailFromSupabase,
+} from './utils/supabase';
 
 import { SplashView } from './components/SplashView';
 import { IntroWalkthrough } from './components/IntroWalkthrough';
@@ -71,6 +76,53 @@ export default function App() {
 
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Check if user returned from Supabase Google OAuth callback
+  useEffect(() => {
+    if (isSupabaseConfigured() && supabase) {
+      supabase.auth.getSession().then(async ({ data: { session } }) => {
+        if (session?.user?.email) {
+          const googleEmail = session.user.email.toLowerCase();
+          const googleName =
+            session.user.user_metadata?.full_name ||
+            session.user.user_metadata?.name ||
+            googleEmail.split('@')[0];
+          const uniqueId = generateUserIdFromEmail(googleEmail);
+
+          try {
+            const existing = await fetchProfileByEmailFromSupabase(googleEmail);
+            if (existing && existing.profile && existing.profile.name) {
+              const merged: UserProfile = {
+                ...DEFAULT_USER,
+                ...existing.profile,
+                id: existing.profile.id || uniqueId,
+                email: googleEmail,
+                avatarUrl: '',
+              };
+              setUser(merged);
+              saveStoredUser(merged);
+              setAppState(existing.profile.onboarded ? 'main' : 'onboarding');
+            } else {
+              const newUser: UserProfile = {
+                ...DEFAULT_USER,
+                id: uniqueId,
+                name: googleName,
+                email: googleEmail,
+                avatarUrl: '',
+                onboarded: false,
+              };
+              setUser(newUser);
+              saveStoredUser(newUser);
+              syncProfileToSupabase(newUser);
+              setAppState('onboarding');
+            }
+          } catch (err) {
+            console.warn('OAuth session profile check error:', err);
+          }
+        }
+      });
+    }
+  }, []);
 
   // Sync state on user change & hydrate from Supabase
   useEffect(() => {

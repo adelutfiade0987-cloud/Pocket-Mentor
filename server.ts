@@ -414,6 +414,10 @@ app.post('/api/mentor/tts', async (req, res) => {
 // Setup Vite middleware in dev or static files in production
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
+  const publicPath = path.resolve(__dirname, 'public');
+
+  // Serve static public assets (sw.js, manifest.json, PNG icons) with accurate MIME types
+  app.use(express.static(publicPath));
 
   if (!isProd) {
     const { createServer } = await import('vite');

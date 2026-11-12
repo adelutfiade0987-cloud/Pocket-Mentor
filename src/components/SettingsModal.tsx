@@ -11,10 +11,8 @@ import {
   Compass,
   MapPin,
   Save,
-  Database,
 } from 'lucide-react';
 import { UserProfile, LifeStage } from '../types';
-import { isSupabaseConfigured } from '../utils/supabase';
 import { PWAInstallButton } from './PWAInstallButton';
 
 interface SettingsModalProps {
@@ -103,15 +101,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-5 space-y-4">
           {/* User Account Info */}
           <div className="flex items-center gap-3 p-3 bg-[#F5F5F9] rounded-2xl">
-            <img
-              src={user.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
-              alt={user.name}
-              className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-xs"
-              referrerPolicy="no-referrer"
-            />
+            {user.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name}
+                className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-xs"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-[#E4E4EE] border-2 border-white shadow-xs flex items-center justify-center text-[#6C5CE7] shrink-0">
+                <User className="w-6 h-6 text-[#6B7280]" />
+              </div>
+            )}
             <div className="flex-1 min-w-0">
-              <span className="text-xs font-bold text-[#1A1A2E] block truncate">{user.name}</span>
-              <span className="text-[11px] text-[#6B7280] block truncate">{user.email}</span>
+              <span className="text-xs font-bold text-[#1A1A2E] block truncate">{user.name || 'Pengguna'}</span>
+              <span className="text-[11px] text-[#6B7280] block truncate">{user.email || 'Akun Pengguna'}</span>
             </div>
           </div>
 
@@ -219,31 +223,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* Database Synchronization Status */}
-          <div className="p-3 rounded-2xl bg-[#F5F5F9] border border-black/[0.05] flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                isSupabaseConfigured() ? 'bg-[#3FB876]/15 text-[#3FB876]' : 'bg-[#FFB020]/15 text-[#FFB020]'
-              }`}>
-                <Database className="w-4 h-4" />
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <h4 className="text-xs font-bold text-[#1A1A2E]">Sinkronisasi Supabase</h4>
-                  <span className={`w-2 h-2 rounded-full ${
-                    isSupabaseConfigured() ? 'bg-[#3FB876] animate-pulse' : 'bg-[#FFB020]'
-                  }`} />
-                </div>
-                <p className="text-[10px] text-[#6B7280]">
-                  {isSupabaseConfigured()
-                    ? 'Cloud sync aktif (Auto-sync 7 tabel: profiles, goals, milestones, journal, finance, calendar, chat)'
-                    : 'Mode Offline (Penyimpanan instan via localStorage fallback)'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* PWA Home Screen Installation Option */}
+          {/* PWA Home Screen Installation Option (Only shown if not yet installed) */}
           <div className="pt-1">
             <PWAInstallButton variant="card" />
           </div>

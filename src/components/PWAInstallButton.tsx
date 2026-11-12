@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Smartphone, Download, Share2, Check, X, PlusSquare, MoreVertical, Sparkles } from 'lucide-react';
+import { Smartphone, Download, Share2, Check, X, ExternalLink, Copy, CheckCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -17,14 +17,24 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'b
   const [isStandalone, setIsStandalone] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
-  const [activeTab, setActiveTab] = useState<'ios' | 'android'>('android');
+  const [isInIframe, setIsInIframe] = useState(false);
+  const [activeTab, setActiveTab] = useState<'android' | 'ios'>('android');
+  const [justInstalled, setJustInstalled] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
-    // Check if app is in standalone mode
+    // Check if app is running in standalone mode (already installed PWA)
     const standaloneMode =
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as unknown as { standalone?: boolean }).standalone === true;
     setIsStandalone(standaloneMode);
+
+    // Check if running inside iframe (browser blocks native PWA prompts inside iframes)
+    try {
+      setIsInIframe(window.self !== window.top);
+    } catch {
+      setIsInIframe(true);
+    }
 
     // Check device type
     const userAgent = window.navigator.userAgent.toLowerCase();
@@ -32,39 +42,77 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'b
     setIsIOS(isIosDevice);
     if (isIosDevice) setActiveTab('ios');
 
+    // Retrieve cached prompt if main.tsx already caught it
+    if ((window as any).deferredPWAInstallPrompt) {
+      setDeferredPrompt((window as any).deferredPWAInstallPrompt);
+    }
+
     // Capture beforeinstallprompt event (Android / Chromium)
-    const handler = (e: Event) => {
+    const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
+      (window as any).deferredPWAInstallPrompt = e;
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
 
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    const handleAppInstalled = () => {
+      setIsStandalone(true);
+      setJustInstalled(true);
+      setDeferredPrompt(null);
+      (window as any).deferredPWAInstallPrompt = null;
+    };
+
+    const handlePromptAvailable = () => {
+      if ((window as any).deferredPWAInstallPrompt) {
+        setDeferredPrompt((window as any).deferredPWAInstallPrompt);
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
+    window.addEventListener('pwa-prompt-available', handlePromptAvailable);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+      window.removeEventListener('pwa-prompt-available', handlePromptAvailable);
+    };
   }, []);
 
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
+    // 1. If native Chromium prompt is ready, trigger it directly!
+    const promptEvent = deferredPrompt || (window as any).deferredPWAInstallPrompt;
+    if (promptEvent) {
       try {
-        await deferredPrompt.prompt();
-        const choice = await deferredPrompt.userChoice;
+        await promptEvent.prompt();
+        const choice = await promptEvent.userChoice;
         if (choice.outcome === 'accepted') {
+          setJustInstalled(true);
           setDeferredPrompt(null);
+          (window as any).deferredPWAInstallPrompt = null;
+          return;
         }
       } catch (err) {
-        setShowGuideModal(true);
+        console.warn('Native PWA prompt error, showing manual guide:', err);
       }
-    } else {
-      setShowGuideModal(true);
     }
+
+    // 2. Fallback: If on iOS, or prompt not ready yet, or inside an iframe, open guide modal
+    setShowGuideModal(true);
   };
 
-  if (isStandalone) {
-    return (
-      <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl bg-[#3FB876]/10 text-[#3FB876] text-xs font-semibold ${className}`}>
-        <Check className="w-4 h-4 stroke-[2.5]" />
-        <span>PocketMentor Terpasang di HP (PWA Mode)</span>
-      </div>
-    );
+  const handleCopyLink = () => {
+    navigator.clipboard?.writeText(window.location.href);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const openInNewTab = () => {
+    window.open(window.location.href, '_blank');
+  };
+
+  // If already installed or running in standalone mode, do not show any badge or prompt
+  if (isStandalone || justInstalled) {
+    return null;
   }
 
   return (
@@ -88,18 +136,18 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'b
               <div className="flex items-center gap-1.5">
                 <h4 className="text-xs font-bold text-[#1A1A2E]">Aplikasi Layar Penuh</h4>
                 <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-[#6C5CE7] text-white">
-                  Instan
+                  {deferredPrompt ? 'Instan' : 'PWA'}
                 </span>
               </div>
               <p className="text-[11px] text-[#6B7280] line-clamp-1">
-                Akses cepat dari Home Screen tanpa unduh di PlayStore.
+                Akses instan dari Home Screen tanpa unduh di PlayStore/AppStore.
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={handleInstallClick}
-            className="px-3 py-2 rounded-xl bg-[#6C5CE7] hover:bg-[#5b4bc7] text-white text-xs font-bold shrink-0 shadow-xs flex items-center gap-1.5 transition-all"
+            className="px-3.5 py-2 rounded-xl bg-[#6C5CE7] hover:bg-[#5b4bc7] text-white text-xs font-bold shrink-0 shadow-xs flex items-center gap-1.5 transition-all"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Install</span>
@@ -119,11 +167,13 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'b
             </div>
             <div className="text-left">
               <span className="block font-bold text-xs text-white">📲 Install Aplikasi di HP Kamu</span>
-              <span className="block text-[10px] text-gray-300">Akses instan di layar utama tanpa browser</span>
+              <span className="block text-[10px] text-gray-300">
+                {deferredPrompt ? 'Ketuk untuk langsung pasang di HP' : 'Buka instan di layar utama tanpa browser'}
+              </span>
             </div>
           </div>
           <div className="px-2.5 py-1 rounded-lg bg-white/10 text-white font-bold text-[11px] flex items-center gap-1">
-            <span>Pasang</span>
+            <span>{deferredPrompt ? 'Pasang Langsung' : 'Pasang'}</span>
             <Download className="w-3 h-3" />
           </div>
         </motion.button>
@@ -146,8 +196,8 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'b
                     <Smartphone className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-[#1A1A2E]">Pasang PocketMentor</h3>
-                    <p className="text-[10px] text-[#6B7280]">Cukup 10 detik, tanpa download file APK</p>
+                    <h3 className="text-sm font-bold text-[#1A1A2E]">Pasang PocketMentor di HP</h3>
+                    <p className="text-[10px] text-[#6B7280]">Cepat, ringan &amp; tanpa download APK</p>
                   </div>
                 </div>
                 <button
@@ -158,6 +208,36 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'b
                   <X className="w-5 h-5" />
                 </button>
               </div>
+
+              {/* Iframe Warning / Direct Mobile Link (Crucial for AI Studio Preview) */}
+              {isInIframe && (
+                <div className="mt-3 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-2">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <span>💡 Tips Membuka di HP:</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed">
+                    Browser membatasi dialog install langsung jika dibuka di dalam panel pratinjau. Buka URL ini langsung di browser Chrome/Safari di HP kamu:
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleCopyLink}
+                      className="flex-1 py-1.5 px-2.5 rounded-xl bg-amber-600 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 shadow-xs"
+                    >
+                      {copiedLink ? <CheckCheck className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedLink ? 'Tersalin!' : 'Salin Tautan'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openInNewTab}
+                      className="py-1.5 px-3 rounded-xl bg-white border border-amber-300 text-amber-800 font-bold text-[11px] flex items-center gap-1"
+                    >
+                      <span>Tab Baru</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Device Tabs */}
               <div className="flex bg-[#F5F5F9] p-1 rounded-xl mt-3 text-xs font-bold">
@@ -190,7 +270,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'b
                         1
                       </div>
                       <div className="text-[#1A1A2E]">
-                        Ketuk tombol <strong>Menu Titik Tiga (⋮)</strong> di pojok kanan atas browser Google Chrome.
+                        Buka aplikasi ini di <strong>Google Chrome</strong> di HP kamu.
                       </div>
                     </div>
                     <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[#F5F5F9]">
@@ -198,7 +278,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'b
                         2
                       </div>
                       <div className="text-[#1A1A2E]">
-                        Pilih menu <strong>"Instal aplikasi"</strong> atau <strong>"Tambahkan ke Layar Utama"</strong>.
+                        Ketuk tombol <strong>Menu Titik Tiga (⋮)</strong> di pojok kanan atas browser Google Chrome.
                       </div>
                     </div>
                     <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[#F5F5F9]">
@@ -206,7 +286,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'b
                         3
                       </div>
                       <div className="text-[#1A1A2E]">
-                        Ketuk <strong>"Instal"</strong>. Ikon PocketMentor akan langsung muncul di beranda HP kamu!
+                        Pilih menu <strong>"Instal aplikasi"</strong> atau <strong>"Tambahkan ke Layar Utama"</strong>. Ikon PocketMentor langsung siap dibuka!
                       </div>
                     </div>
                   </div>
@@ -217,7 +297,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'b
                         1
                       </div>
                       <div className="text-[#1A1A2E]">
-                        Ketuk tombol <strong>Bagikan / Share (<Share2 className="w-3.5 h-3.5 inline text-[#6C5CE7]" />)</strong> di bilah bawah browser Safari.
+                        Buka aplikasi ini di <strong>Safari</strong> di iPhone/iPad kamu.
                       </div>
                     </div>
                     <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[#F5F5F9]">
@@ -225,7 +305,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'b
                         2
                       </div>
                       <div className="text-[#1A1A2E]">
-                        Gulir ke bawah, lalu pilih opsi <strong>"Tambahkan ke Layar Utama" (Add to Home Screen)</strong>.
+                        Ketuk tombol <strong>Bagikan / Share (<Share2 className="w-3.5 h-3.5 inline text-[#6C5CE7]" />)</strong> di bilah bawah browser Safari.
                       </div>
                     </div>
                     <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[#F5F5F9]">
@@ -233,7 +313,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'b
                         3
                       </div>
                       <div className="text-[#1A1A2E]">
-                        Ketuk <strong>"Tambah"</strong> di pojok kanan atas. Buka aplikasinya langsung dari layar utama!
+                        Gulir ke bawah, lalu pilih <strong>"Tambahkan ke Layar Utama" (Add to Home Screen)</strong> lalu tekan <strong>Tambah</strong>.
                       </div>
                     </div>
                   </div>
@@ -244,9 +324,9 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'b
               <button
                 type="button"
                 onClick={() => setShowGuideModal(false)}
-                className="w-full py-2.5 rounded-xl bg-[#6C5CE7] text-white font-bold text-xs shadow-xs"
+                className="w-full py-2.5 rounded-xl bg-[#6C5CE7] text-white font-bold text-xs shadow-xs hover:bg-[#5b4bc7] transition-all"
               >
-                Saya Paham & Siap Pasang
+                Saya Mengerti
               </button>
             </motion.div>
           </div>
